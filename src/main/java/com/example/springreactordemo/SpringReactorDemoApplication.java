@@ -7,7 +7,9 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
+import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -91,11 +93,79 @@ public class SpringReactorDemoApplication implements CommandLineRunner {
         Flux<String> fl1 = Flux.fromIterable(new ArrayList<>());
         fl1.map(String::toUpperCase).filter(a -> a.startsWith("C")).defaultIfEmpty("EMPTY FLUX").subscribe(log::info);
     }
+
     private void m12error() {
         Flux<String> fl1 = Flux.fromIterable(dishes);
         fl1.doOnNext(e -> {
-            throw  new ArithmeticException("Arithmetic Exception custom");
+            throw new ArithmeticException("Arithmetic Exception custom");
         }).onErrorReturn("Error!!").subscribe(log::info);
+    }
+
+    private void m13Threads() {
+        final Mono<String> mono = Mono.just("Hi! ");
+        Thread t1 = new Thread(() -> mono.map(msg -> msg + "thread: ")
+                .subscribe(v -> log.info("{}{}", v, Thread.currentThread().getName())));
+        log.info(Thread.currentThread().getName());
+        t1.start();
+    }
+
+    private void m14PublishOn() {
+        Flux.range(0, 2)
+                .mapNotNull(x -> {
+                    log.info("Valor: ".concat(String.valueOf(x + 1)).concat(" | Thread: ".concat(Thread.currentThread().getName())));
+                    return x;
+                })
+                .publishOn(Schedulers.newSingle("mito-thread"))
+                .mapNotNull(x -> {
+                    log.info("Valor: ".concat(String.valueOf(x + 1)).concat(" | Thread: ".concat(Thread.currentThread().getName())));
+                    return x;
+                })
+                .publishOn(Schedulers.boundedElastic())
+                .mapNotNull(x -> {
+                    log.info("Valor: ".concat(String.valueOf(x + 1)).concat(" | Thread: ".concat(Thread.currentThread().getName())));
+                    return x;
+                })
+                .subscribe();
+    }
+
+    private void m15SubscribeOn() {
+        Flux.range(0, 2)
+                .mapNotNull(x -> {
+                    log.info("Valor: ".concat(String.valueOf(x + 1)).concat(" | Thread: ".concat(Thread.currentThread().getName())));
+                    return x;
+                })
+                .subscribeOn(Schedulers.immediate())
+                .mapNotNull(x -> {
+                    log.info("Valor: ".concat(String.valueOf(x + 1)).concat(" | Thread: ".concat(Thread.currentThread().getName())));
+                    return x;
+                })
+                .subscribe();
+    }
+
+    private void m16PublishSubscribeOn() {
+        Flux.range(0, 2)
+                .publishOn(Schedulers.single())
+                .mapNotNull(x -> {
+                    log.info("Valor: ".concat(String.valueOf(x + 1)).concat(" | Thread: ".concat(Thread.currentThread().getName())));
+                    return x;
+                })
+                .subscribeOn(Schedulers.boundedElastic())
+                .mapNotNull(x -> {
+                    log.info("Valor: ".concat(String.valueOf(x + 1)).concat(" | Thread: ".concat(Thread.currentThread().getName())));
+                    return x;
+                })
+                .subscribe();
+    }
+
+    private void m17runOn() {
+        Flux.range(1, 16)
+                .parallel()
+                .runOn(Schedulers.parallel())
+                .map(x -> {
+                    log.info("Valor: ".concat(String.valueOf(x)).concat(" | Thread: ".concat(Thread.currentThread().getName())));
+                    return x;
+                })
+                .subscribe();
     }
 
     public static void main(String[] args) {
@@ -105,33 +175,8 @@ public class SpringReactorDemoApplication implements CommandLineRunner {
     @Override
     public void run(String... args) throws Exception {
         dishes.addAll(List.of("Ceviche", "Papa rellena", "Sopa"));
-        log.info("CREATE MONO");
-        createMono();
-        log.info("CREATE FLUX");
-        createFlux();
-        log.info("METHOD: 1");
-        m1doOnNext();
-        log.info("METHOD: 2");
-        m2map();
-        log.info("METHOD: 3");
-        m3flatMap();
-        log.info("METHOD: 4");
-        m4range();
-        log.info("METHOD: 5");
-        m5delayElements();
-        log.info("METHOD: 6");
-        m6zipWith();
-        log.info("METHOD: 7");
-        m7merge();
-        log.info("METHOD: 8");
-        m8filter();
-        log.info("METHOD: 9");
-        m9Take();
-        log.info("METHOD: 10");
-        m10TakeLast();
-        log.info("METHOD: 11");
-        m11DefaultIfEmpty();
-        log.info("METHOD: 12");
-        m12error();
+
+        log.info("METHOD: 17");
+        m17runOn();
     }
 }
